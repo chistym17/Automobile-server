@@ -1,14 +1,32 @@
 const express = require("express");
 const cors = require("cors");
+const cookieParser = require('cookie-parser')
 require('dotenv').config()
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const app=express()
 const jwt = require('jsonwebtoken')
 const port=process.env.PORT || 5000
-app.use(cors())
+app.use(cors({
+origin:['http://localhost:5173'],
+credentials:true
+
+}))
 app.use(express.json())
+app.use(cookieParser())
 
+const verifyToken=async(req,res,next)=>
+{
+const token=req.cookies.token
+console.log('token',token)
+if(!token)return res.send({message:'Not Authorized'})
+jwt.verify(token,process.env.Access_Token,(err,decoded)=>{
+if(err)return res.send({message:'Not Authorized'})
+req.user=decoded
+next()
+})
+next()
 
+}
 
 const uri = `mongodb+srv://${process.env.db_user}:${process.env.db_pass}@cluster0.dqsrrse.mongodb.net/?retryWrites=true&w=majority`
 ;
@@ -30,7 +48,7 @@ const Cart = client.db("CartDB").collection("CartItems");
 
 
 
-app.get('/cart', async (req, res) => {
+app.get('/cart', verifyToken,async (req, res) => {
   try {
     const cursor = Cart.find();
     const cartItems = await cursor.toArray();
@@ -63,8 +81,12 @@ res.send(product)
 app.post('/jwt',async(req,res)=>{
 const user=req.body
 const token=jwt.sign(user,process.env.Access_Token,{expiresIn:'1h'})
-console.log(token)
-res.send(token)
+res.cookie('token',token,{
+httpOnly:true,
+secure:false,
+
+})
+res.send({success:true})
 
 })
 
