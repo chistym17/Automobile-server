@@ -3,33 +3,35 @@ const cors = require("cors");
 const cookieParser = require('cookie-parser')
 require('dotenv').config()
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
-const app=express()
+const app = express()
 const jwt = require('jsonwebtoken')
-const port=process.env.PORT || 5000
+const port = process.env.PORT || 5000
 app.use(cors({
-origin:['http://localhost:5173'],
-credentials:true
+  origin: ['http://localhost:5173'],
+  credentials: true
 
 }))
 app.use(express.json())
 app.use(cookieParser())
 
-const verifyToken=async(req,res,next)=>
-{
-const token=req.cookies.token
-console.log('token',token)
-if(!token)return res.send({message:'Not Authorized'})
-jwt.verify(token,process.env.Access_Token,(err,decoded)=>{
-if(err)return res.send({message:'Not Authorized'})
-req.user=decoded
-next()
-})
-next()
+///////////// middleware
+const verifyToken = async (req, res, next) => {
+  const token = req.cookies.token
+  console.log('token', token)
+  if (!token) return res.send({ message: 'Not Authorized' })
+  jwt.verify(token, process.env.Access_Token, (err, decoded) => {
+    if (err) return res.send({ message: 'Not Authorized' })
+    req.user = decoded
+    next()
+
+  }
+  )
+
 
 }
-
+///////////////////
 const uri = `mongodb+srv://${process.env.db_user}:${process.env.db_pass}@cluster0.dqsrrse.mongodb.net/?retryWrites=true&w=majority`
-;
+  ;
 const client = new MongoClient(uri, {
   serverApi: {
     version: ServerApiVersion.v1,
@@ -42,112 +44,120 @@ async function run() {
   try {
     await client.connect();
 
-const ProductsDB = client.db("ProductDB").collection("products");
-const Cart = client.db("CartDB").collection("CartItems");
+    const ProductsDB = client.db("ProductDB").collection("products");
+    const Cart = client.db("CartDB").collection("CartItems");
 
 
 
 
-app.get('/cart', verifyToken,async (req, res) => {
-  try {
-    const cursor = Cart.find();
-    const cartItems = await cursor.toArray();
-    res.send(cartItems);
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    res.status(500).send('Error fetching data');
-  }
-});
+    app.get('/cart', verifyToken, async (req, res) => {
+      console.log(req.user)
+      let query = {}
+      if (req.query?.email) {
+        query = { email: req.query.email }
+      }
+      if(req.user.email!=query.email)return res.send('Unauthorized Access')
+      const cursor = Cart.find();
+      const cartItems = await cursor.toArray();
+      res.send(cartItems);
+
+    });
 
 
-app.get('/brandPage/:brand', async (req, res) => {
-  const brand = req.params.brand;
-  const products = await ProductsDB.find({ brandName: brand }).toArray();
-res.send(products)
-})
+    app.get('/brandPage/:brand', async (req, res) => {
+      const brand = req.params.brand;
+      const products = await ProductsDB.find({ brandName: brand }).toArray();
+      res.send(products)
+    })
 
-app.get('/:name', async (req, res) => {
-  const name = req.params.name;
-  const product = await ProductsDB.findOne({ name: name });
-res.send(product)
-})
+    app.get('/:name', async (req, res) => {
+      const name = req.params.name;
+      const product = await ProductsDB.findOne({ name: name });
+      res.send(product)
+    })
 
-app.get('/update/:name', async (req, res) => {
-  const name = req.params.name;
-  const product = await ProductsDB.findOne({ name: name });
-res.send(product)
-})
+    app.get('/update/:name', async (req, res) => {
+      const name = req.params.name;
+      const product = await ProductsDB.findOne({ name: name });
+      res.send(product)
+    })
+    // ///////jwt
 
-app.post('/jwt',async(req,res)=>{
-const user=req.body
-const token=jwt.sign(user,process.env.Access_Token,{expiresIn:'1h'})
-res.cookie('token',token,{
-httpOnly:true,
-secure:false,
+    app.post('/jwt', async (req, res) => {
+      const user = req.body
+      const token = jwt.sign(user, process.env.Access_Token, { expiresIn: '1h' })
+      res.cookie('token', token, {
+        httpOnly: true,
+        secure: false,
 
-})
-res.send({success:true})
+      })
+      res.send({ success: true })
 
-})
+    })
 
-
-app.post('/addProduct',async(req,res)=>{
-const newProduct=req.body
-
-  const result = await ProductsDB.insertOne(newProduct);
-res.send(result)
-
-})
-
-app.post('/addtoCart',async(req,res)=>{
-const newProduct=req.body
-
-  const result = await Cart.insertOne(newProduct);
-res.send(result)
-
-})
+    // /////////////////
 
 
 
 
-app.post('/update/:id',async(req,res)=>{
-const newProduct=req.body
-const id=req.params.id
-const query={_id:new ObjectId(id)}
-const result = await Cart.insertOne(newProduct);
-res.send(result)
 
-})
+    app.post('/addProduct', async (req, res) => {
+      const newProduct = req.body
 
-app.put('/update/:id',async(req,res)=>{
-const id = req.params.id;
+      const result = await ProductsDB.insertOne(newProduct);
+      res.send(result)
 
-const { name,brandName, price, Description, rating }=req.body
-const query={_id:new ObjectId(id)}
- const updateDoc = {
-      $set: {
-        name:name,
-        brandName:brandName,
-        price:price,
-        Description:Description,
-        rating:rating
+    })
 
-      },
-    };
+    app.post('/addtoCart', async (req, res) => {
+      const newProduct = req.body
 
-const result = await ProductsDB.updateOne(query, updateDoc);
-res.send(result)
+      const result = await Cart.insertOne(newProduct);
+      res.send(result)
 
-})
+    })
 
- app.delete('/:name',async(req,res)=>{
 
- const name = req.params.name;
-const query={ name: name }
- const result = await Cart.deleteOne(query);
-res.send(result)
 
-})
+
+    app.post('/update/:id', async (req, res) => {
+      const newProduct = req.body
+      const id = req.params.id
+      const query = { _id: new ObjectId(id) }
+      const result = await Cart.insertOne(newProduct);
+      res.send(result)
+
+    })
+
+    app.put('/update/:id', async (req, res) => {
+      const id = req.params.id;
+
+      const { name, brandName, price, Description, rating } = req.body
+      const query = { _id: new ObjectId(id) }
+      const updateDoc = {
+        $set: {
+          name: name,
+          brandName: brandName,
+          price: price,
+          Description: Description,
+          rating: rating
+
+        },
+      };
+
+      const result = await ProductsDB.updateOne(query, updateDoc);
+      res.send(result)
+
+    })
+
+    app.delete('/:name', async (req, res) => {
+
+      const name = req.params.name;
+      const query = { name: name }
+      const result = await Cart.deleteOne(query);
+      res.send(result)
+
+    })
 
 
 
