@@ -7,7 +7,7 @@ const app = express()
 const jwt = require('jsonwebtoken')
 const port = process.env.PORT || 5000
 app.use(cors({
-  origin: ['http://localhost:5173'],
+  origin: ['https://brand-shop-project-99899.web.app/','https://brand-shop-project-99899.firebaseapp.com'],
   credentials: true
 
 }))
@@ -49,7 +49,7 @@ async function run() {
 
     app.get('/allproducts', async (req, res) => {
       const pageNumber=parseInt(req.query.page)
-      const projection = { price:1,image:1,brandName:1 };
+      const projection = { name:1,price:1,image:1,brandName:1 };
       const products = await ProductsDB.find().skip(pageNumber*4).limit(4).project(projection).toArray()
       res.send(products)
     });
