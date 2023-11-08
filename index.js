@@ -47,7 +47,12 @@ async function run() {
     const ProductsDB = client.db("ProductDB").collection("products");
     const Cart = client.db("CartDB").collection("CartItems");
 
-
+    app.get('/allproducts', async (req, res) => {
+      const pageNumber=parseInt(req.query.page)
+      const projection = { price:1,image:1,brandName:1 };
+      const products = await ProductsDB.find().skip(pageNumber*4).limit(4).project(projection).toArray()
+      res.send(products)
+    });
 
 
     app.get('/cart', verifyToken, async (req, res) => {
@@ -56,7 +61,7 @@ async function run() {
       if (req.query?.email) {
         query = { email: req.query.email }
       }
-      if(req.user.email!=query.email)return res.send('Unauthorized Access')
+      if (req.user.email != query.email) return res.send('Unauthorized Access')
       const cursor = Cart.find();
       const cartItems = await cursor.toArray();
       res.send(cartItems);
